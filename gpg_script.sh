@@ -20,9 +20,6 @@ if [ "$op" == "E" ]; then
     for file in "$path"/*; do
       gpg --symmetric --yes --batch --cipher-algo AES256 --passphrase="$passphrase" --output "$file.gpg" "$file"
     done
-#    echo "Encryption successful! Encrypted files saved in $path"
-#  else
-#    echo "Invalid path"
   fi
 
 elif [ "$op" == "D" ]; then
@@ -41,9 +38,6 @@ elif [ "$op" == "D" ]; then
     for file in "$path"/*.gpg; do
       gpg --decrypt --yes --batch --cipher-algo AES256 --passphrase="$passphrase" --output "${file%.gpg}" "$file"
     done
-#    echo "Decryption successful! Decrypted files saved in $path"
-#  else
-#    echo "Invalid path"
   fi
 
 else
