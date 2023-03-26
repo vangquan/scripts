@@ -7,7 +7,6 @@ strings=(
     "od ASL"
     "igw ASL"
     "ds BVL"
-    "pt14 ASL"
 )
 
 for i in "${strings[@]}"; do
