@@ -31,4 +31,5 @@ done
 
 # Get file links and play randomly via mpv ` | mpv --playlist=- --shuffle`
 # Get file links and play randomly via vlc ` | vlc - --random`
+# Remove `--shuffle` or `--random` to run the latest first
 curl -s "https://data.jw-api.org/mediator/v1/categories/$lang/$cat" | jq | grep -Eo "https:\/\/[a-zA-Z0-9./?=_%:-]*r720P\.mp4" | vlc - --random
