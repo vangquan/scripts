@@ -13,12 +13,12 @@ if [ "$op" == "E" ]; then
 
   if [ -f "$path" ]; then
     # Encrypt file
-    gpg --symmetric --yes --batch --cipher-algo AES256 --passphrase="$passphrase" --output "$path.gpg" "$path"
+    echo "$passphrase" | gpg --symmetric --yes --batch --cipher-algo AES256 --passphrase-fd 0 --output "$path.gpg" "$path"
     echo "Encryption successful! Encrypted file saved as $path.gpg"
   elif [ -d "$path" ]; then
     # Encrypt folder
     for file in "$path"/*; do
-      gpg --symmetric --yes --batch --cipher-algo AES256 --passphrase="$passphrase" --output "$file.gpg" "$file"
+      echo "$passphrase" | gpg --symmetric --yes --batch --cipher-algo AES256 --passphrase-fd 0 --output "$file.gpg" "$file"
     done
   fi
 
@@ -31,12 +31,12 @@ elif [ "$op" == "D" ]; then
 
   if [ -f "$path" ]; then
     # Decrypt file
-    gpg --decrypt --yes --batch --cipher-algo AES256 --passphrase="$passphrase" --output "${path%.gpg}" "$path"
+    echo "$passphrase" | gpg --decrypt --yes --batch --cipher-algo AES256 --passphrase-fd 0 --output "${path%.gpg}" "$path"
     echo "Decryption successful! Decrypted file saved as ${path%.gpg}"
   elif [ -d "$path" ]; then
     # Decrypt folder
     for file in "$path"/*.gpg; do
-      gpg --decrypt --yes --batch --cipher-algo AES256 --passphrase="$passphrase" --output "${file%.gpg}" "$file"
+      echo "$passphrase" | gpg --decrypt --yes --batch --cipher-algo AES256 --passphrase-fd 0 --output "${file%.gpg}" "$file"
     done
   fi
 
