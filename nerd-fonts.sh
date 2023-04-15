@@ -17,7 +17,7 @@ get_font_choice() {
     2) font="Hack" ;;
     3) font="SourceCodePro" ;;
     4) font="JetBrainsMono" ;;
-    *) echo "Invalid font choice. Please try again."; get_font_choice ;;
+    *) echo "Invalid font choice. Please try again."; get_font_choice; return ;;
   esac
 }
 
@@ -33,7 +33,7 @@ get_os_choice() {
     2) os="Fedora" ;;
     3) os="Arch" ;;
     4) os="macOS" ;;
-    *) echo "Invalid OS choice. Please try again."; get_os_choice ;;
+    *) echo "Invalid OS choice. Please try again."; get_os_choice; return ;;
   esac
 }
 
