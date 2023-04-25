@@ -26,7 +26,7 @@ X=93
 Y=100
 
 # Font settings
-FONT="/Users/home/Library/Fonts/SourceSans3-Bold.otf"
+FONT="$HOME/Library/Fonts/SourceSans3-Bold.otf"
 FONTSIZE=35
 # Fallbak to FONTCOLOR="0xd9d9d9"
 FONTCOLOR="white"
