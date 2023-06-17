@@ -63,6 +63,10 @@ def main(url):
     result = result.replace('\n', '')  # Remove all line breaks
     while '  ' in result:  # Replace all double spaces with single spaces
         result = result.replace('  ', ' ')
+    while ';;' in result:  # Replace all double semicolons with single semicolons
+        result = result.replace(';;', ';')
+    while '; ' in result:  # Replace all semicolon-space with semicolons
+        result = result.replace('; ', ';')
 
     # Print results and open the JW search URL in the default web browser
     print(result)
