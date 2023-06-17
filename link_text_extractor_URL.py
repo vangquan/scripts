@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import sys
 import webbrowser
 import urllib.parse
+import re
 
 # check if URL is provided as an argument
 if len(sys.argv) < 2:
@@ -33,13 +34,23 @@ if article is not None:
     links = article.find_all('a')
     
     # get their full text, including the text within any nested tags
-    links_text = [a.get_text() for a in links if a.get_text() is not None and any(char.isdigit() for char in a.get_text())]
+    links_text = [a.get_text() for a in links if a.get_text() is not None and any(char.isdigit() for char in a.get_text()) and not any(excluded_phrase.lower() in a.get_text().lower() for excluded_phrase in ["chương trình", "mục lục", "bài hát", "th bài học số"])]
     
     # join all the link text into a single string separated by semicolons
     result = ';'.join(links_text)
 
+    # remove semicolon before pure number text
+    result = re.sub(r';\s+(\d+)', r' \1', result)
+
+    # remove all line breaks
+    result = result.replace('\n', '')
+
+    # replace all double spaces with single spaces
+    while '  ' in result:
+        result = result.replace('  ', ' ')
+
     # print results
-    # print(result)
+    print(result)
 
     # URL encode the result
     result = urllib.parse.quote(result)
