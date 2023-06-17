@@ -50,7 +50,7 @@ if article is not None:
         result = result.replace('  ', ' ')
 
     # print results
-    print(result)
+    # print(result)
 
     # URL encode the result
     result = urllib.parse.quote(result)
