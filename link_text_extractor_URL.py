@@ -5,60 +5,75 @@ import webbrowser
 import urllib.parse
 import re
 
-# check if URL is provided as an argument
-if len(sys.argv) < 2:
-    print('Usage: python script.py <URL>')
-    sys.exit(1)
+# Define static values as constants
+EXCLUDE_PHRASES = ["chương trình", "mục lục", "bài hát", "th bài học số"]
+SEARCH_URL = 'https://wol.jw.org/vi/wol/l/r47/lp-vt?q={}'
 
-# get the URL from command-line arguments
-url = sys.argv[1]
+def get_parsed_html(url):
+    """
+    This function sends a GET request to the provided URL and returns a BeautifulSoup object.
+    """
+    try:
+        r = requests.get(url)
+        r.raise_for_status()  # If the request failed, it will raise an HTTPError exception
+    except requests.exceptions.RequestException as e:
+        print(f"Error occurred: {e}")
+        sys.exit(1)
 
-# send a HTTP request to the specified URL
-r = requests.get(url)
+    return BeautifulSoup(r.text, 'html.parser')
 
-# create a BeautifulSoup object and specify the parser
-soup = BeautifulSoup(r.text, 'html.parser')
-
-# find the article with the specified id
-article = soup.find('article', id='article')
-
-if article is not None:
-    # find all 'em' tags within the article
+def get_links_text(article):
+    """
+    This function receives a BeautifulSoup object and returns a list of link texts after removing 'em' tags and applying filters.
+    """
+    # find all 'em' tags within the article and unwrap them
     em_tags = article.find_all('em')
-    
-    # remove all 'em' tags but keep their contents
     for tag in em_tags:
         tag.unwrap()
 
-    # find all hyperlink tags within the article
+    # find all hyperlink tags within the article, filter and store their full text
     links = article.find_all('a')
-    
-    # get their full text, including the text within any nested tags
-    links_text = [a.get_text() for a in links if a.get_text() is not None and any(char.isdigit() for char in a.get_text()) and not any(excluded_phrase.lower() in a.get_text().lower() for excluded_phrase in ["chương trình", "mục lục", "bài hát", "th bài học số"])]
-    
-    # join all the link text into a single string separated by semicolons
+    links_text = [
+        a.get_text() for a in links
+        if a.get_text() is not None
+        and any(char.isdigit() for char in a.get_text())
+        and not any(excluded_phrase.lower() in a.get_text().lower() for excluded_phrase in EXCLUDE_PHRASES)
+    ]
+    return links_text
+
+def main(url):
+    """
+    Main function where all the steps are orchestrated.
+    """
+    # Get parsed HTML from the URL
+    soup = get_parsed_html(url)
+
+    # Find the 'article' with the specified id
+    article = soup.find('article', id='article')
+    if article is None:
+        print("The specified article id was not found.")
+        return
+
+    # Extract the link texts
+    links_text = get_links_text(article)
+
+    # Join link texts, format the string, and remove unnecessary characters
     result = ';'.join(links_text)
-
-    # remove semicolon before pure number text
-    result = re.sub(r';\s+(\d+)', r' \1', result)
-
-    # remove all line breaks
-    result = result.replace('\n', '')
-
-    # replace all double spaces with single spaces
-    while '  ' in result:
+    result = re.sub(r';\s+(\d+)', r' \1', result)  # Remove semicolon before pure number text
+    result = result.replace('\n', '')  # Remove all line breaks
+    while '  ' in result:  # Replace all double spaces with single spaces
         result = result.replace('  ', ' ')
 
-    # print results
-    # print(result)
-
-    # URL encode the result
+    # Print results and open the JW search URL in the default web browser
+    print(result)
     result = urllib.parse.quote(result)
-
-    # format the JW search URL with the result
-    search_url = f'https://wol.jw.org/vi/wol/l/r47/lp-vt?q={result}'
-
-    # open the search URL in the default web browser
+    search_url = SEARCH_URL.format(result)
     webbrowser.open(search_url)
-else:
-    print("The specified article id was not found.")
+
+# If this script is run as the main program (not imported as a module), execute the main function
+if __name__ == "__main__":
+    # Check if URL is provided as an argument
+    if len(sys.argv) < 2:
+        print('Usage: python script.py <URL>')
+        sys.exit(1)
+    main(sys.argv[1])
