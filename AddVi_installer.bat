@@ -1,25 +1,24 @@
 :: Version 20231028
 
 @echo off
-setlocal enabledelayedexpansion
 
 :: Suggested installation path
 set "suggested_install_path=%userprofile%\AddVi"
 
 :: Ask the user where to install
 set /p "install_path=Enter installation path [%suggested_install_path%] (press Enter to accept): "
-if "!install_path!"=="" set "install_path=!suggested_install_path!"
-set "install_path=!install_path!"
+if "%install_path%"=="" set "install_path=%suggested_install_path%"
+set "install_path=%install_path%"
 
 :: Check if the specified directory exists; create it if it doesn't
-if not exist "!install_path!" (
+if not exist "%install_path%" (
     echo Directory does not exist. Creating the directory...
-    mkdir "!install_path!"
+    mkdir "%install_path%"
 )
 
 :: Download AddVi.bat
 echo Downloading AddVi.bat...
-curl -o "!install_path!\AddVi.bat" "https://raw.githubusercontent.com/vangquan/scripts/main/AddVi.bat"
+curl -o "%install_path%\AddVi.bat" "https://raw.githubusercontent.com/vangquan/scripts/main/AddVi.bat"
 
 :: Check if the download was successful
 if %errorlevel% neq 0 (
@@ -29,16 +28,17 @@ if %errorlevel% neq 0 (
 )
 
 :: Download NotoSans-Bold.ttf
-set "fontPath=%LocalAppData%\Microsoft\Windows\Fonts\NotoSans-Bold.ttf"
+set "fontPath=%LocalAppData%\Microsoft\Windows\Fonts\"
 if not exist "%fontPath%" (
+    mkdir "%fontPath%"
     echo Downloading NotoSans-Bold.ttf...
-    curl -o "%LocalAppData%\Microsoft\Windows\Fonts\NotoSans-Bold.ttf" "https://b.jw-cdn.org/fonts/noto-sans/2.007-edcd458/hinted/NotoSans-Bold.ttf"
+    curl -o "%fontPath%\NotoSans-Bold.ttf" "https://b.jw-cdn.org/fonts/noto-sans/2.007-edcd458/hinted/NotoSans-Bold.ttf"
 ) else (
     echo Font NotoSans-Bold.ttf is available in %LocalAppData%\Microsoft\Windows\Fonts.
 )
 
 :: Inform the user
-echo AddVi.bat has been downloaded to "!install_path!" and NotoSans-Bold.ttf has been installed.
+echo AddVi.bat has been downloaded to "%install_path%" and NotoSans-Bold.ttf has been installed.
 
 :: Define the temporary directory and FFmpeg download URL
 set "temp_dir=%temp%\ffmpeg_temp"
@@ -67,7 +67,7 @@ if %errorlevel% neq 0 (
             )
         )
         
-        echo FFmpeg has been downloaded and installed to %install_path%
+        echo FFmpeg has been downloaded and installed to "%install_path%"
     ) else (
         echo Failed to download FFmpeg.
     )
@@ -82,25 +82,44 @@ set "sendToDir=%APPDATA%\Microsoft\Windows\SendTo"
 :: Define the shortcut name
 set "shortcutName=AddVi.lnk"
 
-:: Check if the shortcut exists
-if exist "!target!" (
-    echo Shortcut already exists: "!target!"
-    pause
-    exit /b 1
-)
-
 :: Create the shortcut
-set "target=%sendToDir%\!shortcutName!"
+set "target=%sendToDir%\%shortcutName%"
 echo Set oWS = WScript.CreateObject("WScript.Shell") > "%temp%\CreateShortcut.vbs"
-echo sLinkFile = "!target!" >> "%temp%\CreateShortcut.vbs"
+echo sLinkFile = "%target%" >> "%temp%\CreateShortcut.vbs"
 echo Set oLink = oWS.CreateShortcut(sLinkFile) >> "%temp%\CreateShortcut.vbs"
-echo oLink.TargetPath = "!sourceFile!" >> "%temp%\CreateShortcut.vbs"
+echo oLink.TargetPath = "%sourceFile%" >> "%temp%\CreateShortcut.vbs"
 echo oLink.Save >> "%temp%\CreateShortcut.vbs"
 cscript /nologo "%temp%\CreateShortcut.vbs"
 del "%temp%\CreateShortcut.vbs"
 
 :: Inform the user
-echo Shortcut created: "!target!"
+echo Shortcut created: "%target%"
 
 :: End of the script
+
+:: ASCII outro
+cls
+::: 
+:::  ________  ________  ________  ___      ___ ___                                                   
+::: |\   __  \|\   ___ \|\   ___ \|\  \    /  /|\  \                                                  
+::: \ \  \|\  \ \  \_|\ \ \  \_|\ \ \  \  /  / | \  \                                                 
+:::  \ \   __  \ \  \ \\ \ \  \ \\ \ \  \/  / / \ \  \                                                
+:::   \ \  \ \  \ \  \_\\ \ \  \_\\ \ \    / /   \ \  \                                               
+:::    \ \__\ \__\ \_______\ \_______\ \__/ /     \ \__\                                              
+:::     \|__|\|__|\|_______|\|_______|\|__|/       \|__|                                              
+:::                                                                                                   
+:::                                                                                                   
+:::                                                                                                   
+:::  ___  ________   ________  _________  ________  ___       ___       _______   ________  ___       
+::: |\  \|\   ___  \|\   ____\|\___   ___\\   __  \|\  \     |\  \     |\  ___ \ |\   ___ \|\  \      
+::: \ \  \ \  \\ \  \ \  \___|\|___ \  \_\ \  \|\  \ \  \    \ \  \    \ \   __/|\ \  \_|\ \ \  \     
+:::  \ \  \ \  \\ \  \ \_____  \   \ \  \ \ \   __  \ \  \    \ \  \    \ \  \_|/_\ \  \ \\ \ \  \    
+:::   \ \  \ \  \\ \  \|____|\  \   \ \  \ \ \  \ \  \ \  \____\ \  \____\ \  \_|\ \ \  \_\\ \ \__\   
+:::    \ \__\ \__\\ \__\____\_\  \   \ \__\ \ \__\ \__\ \_______\ \_______\ \_______\ \_______\|__|   
+:::     \|__|\|__| \|__|\_________\   \|__|  \|__|\|__|\|_______|\|_______|\|_______|\|_______|   ___ 
+:::                    \|_________|                                                              |\__\
+:::                                                                                              \|__|
+::: 
+for /f "delims=: tokens=*" %%A in ('findstr /b ::: "%~f0"') do @echo(%%A
+
 pause
