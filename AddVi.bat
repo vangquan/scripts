@@ -19,7 +19,7 @@ for %%I in ("%~1") do (
 
 REM Run FFmpeg with the specified filter and font, saving the output in the same directory
 cd %~dp0
-ffmpeg -i "%~1" -vf "delogo=x=85:y=47:w=245:h=40:show=0,drawtext=text='!citationtext!':font=Noto Sans Bold:fontcolor=white:fontsize=30:x=93:y=53:alpha=0.9" "!output_dir!!output_filename!"
+ffmpeg -i "%~1" -vf "delogo=x=85:y=47:w=300:h=40:show=0,drawtext=text='!citationtext!':font=Noto Sans Bold:fontcolor=white:fontsize=30:x=93:y=53:alpha=0.9" "!output_dir!!output_filename!"
 
 REM Check if FFmpeg command was successful
 if %errorlevel% eq 0 (
