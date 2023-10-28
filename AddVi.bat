@@ -10,9 +10,6 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-REM Specify the absolute path to the font file
-set "font_file=NotoSans-Bold.ttf"
-
 REM Prompt the user to input text
 set /p "sometext=Enter citation text: "
 
@@ -34,7 +31,8 @@ for %%I in ("%~1") do (
 )
 
 REM Run FFmpeg with the specified filter and font, saving the output in the same directory
-ffmpeg -i "%~1" -vf "delogo=x=85:y=47:w=245:h=40:show=0,drawtext=text='!citationtext!':fontfile=!font_file!:fontcolor=white:fontsize=30:x=93:y=53:alpha=1" "!output_dir!!output_filename!"
+cd %LocalAppData%\Microsoft\Windows\Fonts
+ffmpeg -i "%~1" -vf "delogo=x=85:y=47:w=245:h=40:show=0,drawtext=text='!citationtext!':fontfile=NotoSans-Bold.ttf:fontcolor=white:fontsize=30:x=93:y=53:alpha=1" "!output_dir!!output_filename!"
 
 REM Check if FFmpeg command was successful
 if %errorlevel% eq 0 (
