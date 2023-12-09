@@ -1,22 +1,25 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: gray; icon-glyph: book;
-// Version 2023-12-09
-// Customizable options
-// wtLocale must be lowercase, for example 'e', 's', 'j', 'ko', 'tg', 'vt' and must be lowercase
-// rVersion must correspond to wtLocale -> '1', '4', '7', '8', '27', '47'
+// Version 2023-12-10
+// Fonts to install: ClearTextMediumItalic (https://b.jw-cdn.org/fonts/wt-clear-text/1.024/Wt-ClearText-MediumItalic.ttf),
+// Noto Sans (https://b.jw-cdn.org/fonts/noto-sans/2.007-edcd458/hinted/NotoSans-Regular.ttf),
+// jw-icons-external (https://assetsnffrgf-a.akamaihd.net/assets/ct/f227aa83fb/fonts/jw-icons-external-1970474.ttf)
+// Example of wtLocale values: 'e', 's', 'j', 'ko', 'tg', 'vt'
+// rsconf must correspond to wtLocale -> '1', '4', '7', '8', '27', '47'
+// To find your required wtLocale and rsconf values, please go to the WOL of your language and check the address.
 const customization = {
   titleTxtSize: 20,
   titleTxtFontname: "ClearTextMediumItalic",
-  lighttitleTextColor: new Color("#4a6da7"),
-  darktitleTextColor: new Color("#8099c1"),
+  lightTitleTextColor: new Color("#4a6da7"),
+  darkTitleTextColor: new Color("#8099c1"),
   articleTxtOpacity: 0.8,
   articleTxtSize: 15,
   articleTxtFontname: "Noto Sans",
   lightTextColor: new Color("#6e8ab9"),  // Customize light text color
   darkTextColor: new Color("#5c7cb0"),  // Customize dark text color
-  wtLocale: 'vt', // Example change to 'es' for Spanish
-  rVersion: '47',
+  wtLocale: 'vt', // Example change to 's' for Spanish
+  rsconf: '47',
   backgroundGradientLocations: [0, 0.6],
   lightBackgroundColor: new Color("#edf0f6"),  // Customize light background color
   darkBackgroundColor: new Color("#1e2c43"),  // Customize dark background color
@@ -70,7 +73,7 @@ function createWidget(dailyText) {
   }
 
   // Use dynamic colors for text color
-  let dynamicTitleColor = Color.dynamic(customization.lighttitleTextColor, customization.darktitleTextColor);
+  let dynamicTitleColor = Color.dynamic(customization.lightTitleTextColor, customization.darkTitleTextColor);
   titleTxt.textColor = dynamicTitleColor;
 
   // Add spacing of 1 between titleTxt and articleTxt
@@ -106,7 +109,7 @@ function createWidget(dailyText) {
 async function loadText() {
   try {
     const date = new Date();
-    let url = `https://wol.jw.org/wol/dt/r${customization.rVersion}/lp-${customization.wtLocale.toLowerCase()}/${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}`;
+    let url = `https://wol.jw.org/wol/dt/r${customization.rsconf}/lp-${customization.wtLocale.toLowerCase()}/${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}`;
     let req = new Request(url);
     let json = await req.loadJSON();
     return json.items[0];
@@ -117,11 +120,11 @@ async function loadText() {
 }
 
 function extractScripture(item) {
-  let regex = /<em>(.*)<\/em>/;
+  let regex = /<p[^>]*>(.*?)<\/p>/s;
   let html = item.content;
   let matches = html.match(regex);
   if (matches && matches.length >= 2) {
-    return matches[1];
+		return matches[1].trim();
   } else {
     return null;
   }
