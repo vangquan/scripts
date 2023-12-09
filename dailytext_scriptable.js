@@ -1,22 +1,28 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: gray; icon-glyph: book;
-// Version 2023-12-08
+// Version 2023-12-09
 // Customizable options
 // wtLocale must be lowercase, for example 'e', 's', 'j', 'ko', 'tg', 'vt' and must be lowercase
 // rVersion must correspond to wtLocale -> '1', '4', '7', '8', '27', '47'
 const customization = {
   titleTxtSize: 20,
   titleTxtFontname: "ClearTextMediumItalic",
-  titleTxtColor: new Color("#4a6da7"),
+  lighttitleTextColor: new Color("#4a6da7"),
+  darktitleTextColor: new Color("#8099c1"),
   articleTxtOpacity: 0.8,
   articleTxtSize: 15,
   articleTxtFontname: "Noto Sans",
-  articleTxtColor: new Color("#4a6da7"),
+  lightTextColor: new Color("#6e8ab9"),  // Customize light text color
+  darkTextColor: new Color("#5c7cb0"),  // Customize dark text color
   wtLocale: 'vt', // Example change to 'es' for Spanish
   rVersion: '47',
-  backgroundGradientColors: [new Color("#fff"), new Color("#dbe2ed")],
   backgroundGradientLocations: [0, 0.6],
+  lightBackgroundColor: new Color("#edf0f6"),  // Customize light background color
+  darkBackgroundColor: new Color("#1e2c43"),  // Customize dark background color
+  logoTxtSize: 20,
+  lightLogoTextColor: new Color("#4a6da7"),  // Customize light logotext color
+  darkLogoTextColor: new Color("#8099c1"),  // Customize dark logotext color
 };
 
 let dailyText = await loadText();
@@ -31,6 +37,12 @@ if (config.runsInWidget) {
   Safari.open(jwOrgUrl);
 }
 
+// Function to right-align a text element
+function AlignText(textElement) {
+  textElement.rightAlignText();
+  // textElement.centerAlignText();
+}
+
 function createWidget(dailyText) {
   const scripture = extractScripture(dailyText).replace(/<[^>]*>?/gm, '');
   const text = extractText(dailyText).replace(/<[^>]*>?/gm, '');
@@ -41,8 +53,12 @@ function createWidget(dailyText) {
   w.url = jwOrgUrl;
 
   let gradient = new LinearGradient();
-  gradient.colors = customization.backgroundGradientColors;
+
+  // Use dynamic colors for background gradient
+  let dynamicLightColor = Color.dynamic(customization.lightBackgroundColor, customization.darkBackgroundColor);
+  gradient.colors = [dynamicLightColor];
   gradient.locations = customization.backgroundGradientLocations;
+
   w.backgroundGradient = gradient;
 
   let titleTxt = w.addText(scripture);
@@ -53,7 +69,9 @@ function createWidget(dailyText) {
     titleTxt.font = Font.italicSystemFont(customization.titleTxtSize);
   }
 
-  titleTxt.textColor = customization.titleTxtColor;
+  // Use dynamic colors for text color
+  let dynamicTitleColor = Color.dynamic(customization.lighttitleTextColor, customization.darktitleTextColor);
+  titleTxt.textColor = dynamicTitleColor;
 
   // Add spacing of 1 between titleTxt and articleTxt
   w.addSpacer(5);
@@ -66,9 +84,22 @@ function createWidget(dailyText) {
     article.font = Font.regularSystemFont(customization.articleTxtSize);
   }
 
-  article.textColor = customization.articleTxtColor;
+  // Use dynamic colors for text color and opacity
+  let dynamicArticleColor = Color.dynamic(customization.lightTextColor, customization.darkTextColor);
+  article.textColor = dynamicArticleColor;
   article.textOpacity = customization.articleTxtOpacity;
 
+  // Add spacing between article text and logotext
+  // w.addSpacer();
+
+  // Add the logotext "" at the bottom right
+  let logoText = w.addText("");
+
+  // Customize logotext font, size, and colors
+  logoText.font = new Font("jw-icons-external", customization.logoTxtSize);
+  let dynamicLogoColor = Color.dynamic(customization.lightLogoTextColor, customization.darkLogoTextColor);
+  logoText.textColor = dynamicLogoColor;
+	AlignText(logoText);
   return w;
 }
 
