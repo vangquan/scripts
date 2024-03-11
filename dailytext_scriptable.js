@@ -1,7 +1,7 @@
 // Variables used by Scriptable.
 // These must be at the very top of the file. Do not edit.
 // icon-color: gray; icon-glyph: book;
-// Version 2023-12-10
+// Version 2024-03-12
 // Fonts to install: ClearTextMediumItalic (https://b.jw-cdn.org/fonts/wt-clear-text/1.024/Wt-ClearText-MediumItalic.ttf),
 // Noto Sans (https://b.jw-cdn.org/fonts/noto-sans/2.007-edcd458/hinted/NotoSans-Regular.ttf),
 // jw-icons-external (https://assetsnffrgf-a.akamaihd.net/assets/ct/f227aa83fb/fonts/jw-icons-external-1970474.ttf)
@@ -28,7 +28,87 @@ const customization = {
   darkLogoTextColor: new Color("#8099c1"),  // Customize dark logotext color
 };
 
+// Include the Cache class. Learn from the MLB-16 script https://github.com/evandcoleman/scriptable/releases/tag/MLB-16
+class Cache {
+  constructor(name, expirationMinutes) {
+    this.fm = FileManager.iCloud();
+    this.cachePath = this.fm.joinPath(this.fm.documentsDirectory(), name);
+    this.expirationMinutes = expirationMinutes;
+
+    if (!this.fm.fileExists(this.cachePath)) {
+      this.fm.createDirectory(this.cachePath)
+    }
+  }
+
+  async read(key, expirationMinutes) {
+    try {
+      const path = this.fm.joinPath(this.cachePath, key);
+      await this.fm.downloadFileFromiCloud(path);
+      const createdAt = this.fm.creationDate(path);
+      
+      if (this.expirationMinutes || expirationMinutes) {
+        if ((new Date()) - createdAt > ((this.expirationMinutes || expirationMinutes) * 60000)) {
+          this.fm.remove(path);
+          return null;
+        }
+      }
+      
+      const value = this.fm.readString(path);
+    
+      try {
+        return JSON.parse(value);
+      } catch(error) {
+        return value;
+      }
+    } catch(error) {
+      return null;
+    }
+  };
+
+  write(key, value) {
+    const path = this.fm.joinPath(this.cachePath, key.replace('/', '-'));
+    console.log(`Caching to ${path}...`);
+
+    if (typeof value === 'string' || value instanceof String) {
+      this.fm.writeString(path, value);
+    } else {
+      this.fm.writeString(path, JSON.stringify(value));
+    }
+  }
+}
+
+// Create a new Cache instance with a name and expiration time in minutes
+const cache = new Cache('dailyTextCache', 60);
+
+// Function to load text from cache or fetch it if not available
+async function loadText() {
+  try {
+    const cachedText = await cache.read('dailyText');
+    
+    if (cachedText) {
+      console.log('Using cached text.');
+      return cachedText;
+    }
+
+    // If not in cache, fetch the text
+    const date = new Date();
+    let url = `https://wol.jw.org/wol/dt/r${customization.rsconf}/lp-${customization.wtLocale.toLowerCase()}/${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}`;
+    let req = new Request(url);
+    let json = await req.loadJSON();
+    
+    // Cache the fetched text
+    cache.write('dailyText', json.items[0]);
+
+    return json.items[0];
+  } catch (error) {
+    console.error(`Failed to load text: ${error}`);
+    return null; // Or handle the error as appropriate for your use case
+  }
+}
+
+// Use the loadText function to fetch or use cached text
 let dailyText = await loadText();
+
 const date = new Date();
 const jwOrgUrl = `https://www.jw.org/finder?srcid=jwlshare&wtlocale=${customization.wtLocale.toUpperCase()}&prefer=lang&alias=daily-text&date=${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
 
@@ -104,19 +184,6 @@ function createWidget(dailyText) {
   logoText.textColor = dynamicLogoColor;
 	AlignText(logoText);
   return w;
-}
-
-async function loadText() {
-  try {
-    const date = new Date();
-    let url = `https://wol.jw.org/wol/dt/r${customization.rsconf}/lp-${customization.wtLocale.toLowerCase()}/${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}`;
-    let req = new Request(url);
-    let json = await req.loadJSON();
-    return json.items[0];
-  } catch (error) {
-    console.error(`Failed to load text: ${error}`);
-    return null; // Or handle the error as appropriate for your use case
-  }
 }
 
 function extractScripture(item) {
