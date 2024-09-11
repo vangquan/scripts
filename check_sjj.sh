@@ -10,9 +10,6 @@ fetch_tracks() {
         | jq ".files.$lang.MP4[].track" | sort -n | uniq
 }
 
-# Trap to handle cleanup (e.g., temporary files) - currently no temp files, but added for future use
-trap "rm -f /tmp/some_temp_file" EXIT
-
 # Check if at least one language is provided, or display help
 if [[ "$#" -eq 0 || "$1" == "--help" ]]; then
     echo "Usage: $0 <lang1> [<lang2> ...]"
