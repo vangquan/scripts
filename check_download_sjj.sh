@@ -24,12 +24,17 @@ get_download_link() {
         | grep -Eo "https:\/\/[a-zA-Z0-9./?=_%:-]*r720P\.mp4"
 }
 
-# Function to check if a language is valid
-check_valid_lang() {
-    local lang=$1
-    if ! echo "$valid_lang_codes" | grep -q "$lang"; then
-        echo "Error: '$lang' is not a valid mnemonic sign language code."
-        exit 1
+# Function to check if languages are valid
+check_valid_langs() {
+    local invalid_langs=()
+    for lang in "$@"; do
+        if ! echo "$valid_lang_codes" | grep -q "$lang"; then
+            invalid_langs+=("$lang")
+        fi
+    done
+
+    if [ ${#invalid_langs[@]} -ne 0 ]; then
+        echo "Warning: The following are not valid mnemonic sign language codes: ${invalid_langs[*]}"
     fi
 }
 
@@ -59,7 +64,7 @@ if [[ "$#" -ge 2 && "$1" =~ ^[0-9]+$ ]]; then
     fi
 
     # Validate the language code
-    check_valid_lang "$lang"
+    check_valid_langs "$lang"
 
     # Ensure the specified path is a directory
     if [ ! -d "$path" ]; then
@@ -85,20 +90,26 @@ else
     # Arrays to hold track lists for each language
     declare -A tracks
 
-    # Validate each language code before fetching
+    # Check for valid languages before fetching
+    valid_langs=()
     for lang in "$@"; do
-        check_valid_lang "$lang"
+        if echo "$valid_lang_codes" | grep -q "$lang"; then
+            valid_langs+=("$lang")
+        fi
     done
 
-    # Fetch track lists for each language passed as arguments sequentially
-    for lang in "$@"; do
+    # Notify user about invalid languages
+    check_valid_langs "$@"
+
+    # Fetch track lists for each valid language
+    for lang in "${valid_langs[@]}"; do
         echo "Fetching tracks for $lang..."
         tracks[$lang]=$(fetch_tracks "$lang")
     done
 
     # Create arrays for each language
     declare -A lang_arr
-    for lang in "$@"; do
+    for lang in "${valid_langs[@]}"; do
         for track in ${tracks[$lang]}; do
             lang_arr["$lang,$track"]="$track ($lang)"
         done
@@ -106,11 +117,11 @@ else
 
     # Output table header
     header="|No.|"
-    for lang in "$@"; do
+    for lang in "${valid_langs[@]}"; do
         header+="$(printf "%-9s|" "$lang")"
     done
     header+="\n|---|"
-    for lang in "$@"; do
+    for lang in "${valid_langs[@]}"; do
         header+="---------|"
     done
     echo -e "$header"
@@ -118,7 +129,7 @@ else
     # Loop from 0 to 159 to display each track
     for i in {0..159}; do
         row="|$(printf "%3d|" "$i")"
-        for lang in "$@"; do
+        for lang in "${valid_langs[@]}"; do
             val="${lang_arr["$lang,$i"]:-}"
             [ -z "$val" ] && val="         "
             row+="$(printf "%9s|" "$val")"
