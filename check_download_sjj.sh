@@ -16,12 +16,23 @@ fetch_tracks() {
         | jq ".files.$lang.MP4[].track" | sort -n | uniq
 }
 
-# Function to get the download link for a specific language and track number using grep
+# Function to get the download link for a specific language and track number
 get_download_link() {
     local lang=$1
     local number=$2
-    curl -s "https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS?output=json&pub=sjj&fileformat=MP4&alllangs=0&langwritten=$lang&track=$number" \
-        | grep -Eo "https:\/\/[a-zA-Z0-9./?=_%:-]*r720P\.mp4"
+
+    # Fetch the download link
+    local link
+    link=$(curl -s "https://b.jw-cdn.org/apis/pub-media/GETPUBMEDIALINKS?output=json&pub=sjj&fileformat=MP4&alllangs=0&langwritten=$lang&track=$number" \
+        | grep -Eo "https:\/\/[a-zA-Z0-9./?=_%:-]*r720P\.mp4")
+
+    # Check if the link is empty
+    if [[ -z "$link" ]]; then
+        return 1  # Indicate failure (no link found)
+    else
+        echo "$link"  # Return the found link
+        return 0  # Indicate success
+    fi
 }
 
 # Function to check if languages are valid
@@ -72,17 +83,14 @@ if [[ "$#" -ge 2 && "$1" =~ ^[0-9]+$ ]]; then
         exit 1
     fi
 
-    # Fetch the download link using grep
-    link=$(get_download_link "$lang" "$number")
-
-    if [[ -z "$link" ]]; then
-        echo "Error: No valid download link found for language '$lang' and track '$number'."
-        exit 1
+    # Fetch the download link
+    if link=$(get_download_link "$lang" "$number"); then
+        # Optimize aria2c download settings (parallel connections and chunking)
+        aria2c --file-allocation=falloc --human-readable=true -x16 -s16 -j5 --remote-time=true -c --conditional-get=true --allow-overwrite=true --download-result=full "$link" --dir="$path"
+        echo "Download completed: Track $number in $lang saved to $path"
+    else
+        echo "Warning: No valid download link found for track '$number' in '$lang'."
     fi
-
-    # Optimize aria2c download settings (parallel connections and chunking)
-    aria2c --file-allocation=falloc --human-readable=true -x16 -s16 -j5 --remote-time=true -c --conditional-get=true --allow-overwrite=true --download-result=full "$link" --dir="$path"
-    echo "Download completed: Track $number in $lang saved to $path"
 
 else
     # Usage 1: Fetch and display tracks for given languages
