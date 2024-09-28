@@ -38,15 +38,20 @@ get_download_link() {
 # Function to check if languages are valid
 check_valid_langs() {
     local invalid_langs=()
+    local valid_langs=()
     for lang in "$@"; do
-        if ! echo "$valid_lang_codes" | grep -q "$lang"; then
+        if echo "$valid_lang_codes" | grep -q "$lang"; then
+            valid_langs+=("$lang")
+        else
             invalid_langs+=("$lang")
         fi
     done
 
     if [ ${#invalid_langs[@]} -ne 0 ]; then
-        echo "Warning: The following are not valid mnemonic sign language codes: ${invalid_langs[*]}"
+        echo "Warning: The following are not valid mnemonic sign language codes: ${invalid_langs[*]}" >&2
     fi
+
+    echo "${valid_langs[@]}"  # Return only valid languages
 }
 
 # Fetch the list of valid mnemonic sign language codes
@@ -56,26 +61,45 @@ valid_lang_codes=$(fetch_valid_lang_codes)
 if [[ "$#" -eq 0 || "$1" == "--help" ]]; then
     echo "Usage 1: $0 <lang1> [<lang2> ...]"
     echo "       Fetch and display video tracks for the given languages."
-    echo "Usage 2: $0 <a number> <lang> [path_to_save]"
-    echo "       Download a video track by providing a number, language, and optional save path."
+    echo "Usage 2: $0 <number1> [<number2> ...] <lang1> [<lang2> ...] [path_to_save]"
+    echo "       Download multiple tracks across multiple languages."
     exit 1
 fi
 
-# Determine the mode of operation
-if [[ "$#" -ge 2 && "$1" =~ ^[0-9]+$ ]]; then
-    # Usage 2: Download mode
-    number=$1
-    lang=$2
-    path=${3:-.}  # Default to current directory if not provided
+# Determine if it's Usage 2 (multiple tracks and multiple languages)
+if [[ "$#" -ge 3 && "$1" =~ ^[0-9]+$ ]]; then
+    # Extract numbers and languages from the input
+    numbers=()
+    langs=()
+    path="."
 
-    # Validate the number is within the range 0 to 159
-    if [ "$number" -lt 0 ] || [ "$number" -gt 159 ]; then
-        echo "Error: <a number> must be an integer between 0 and 159."
+    # Separate numbers, languages, and optional path
+    for arg in "$@"; do
+        if [[ "$arg" =~ ^[0-9]+$ ]]; then
+            numbers+=("$arg")
+        elif [[ "$arg" =~ ^[A-Z]{2,3}$ ]]; then
+            langs+=("$arg")
+        else
+            path="$arg"
+        fi
+    done
+
+    # Validate the numbers
+    for number in "${numbers[@]}"; do
+        if [ "$number" -lt 0 ] || [ "$number" -gt 159 ]; then
+            echo "Error: Track number '$number' must be between 0 and 159."
+            exit 1
+        fi
+    done
+
+    # Check for valid languages
+    valid_langs=$(check_valid_langs "${langs[@]}")
+
+    # Ensure there's at least one valid language
+    if [ -z "$valid_langs" ]; then
+        echo "Error: No valid languages provided. Cannot proceed with download."
         exit 1
     fi
-
-    # Validate the language code
-    check_valid_langs "$lang"
 
     # Ensure the specified path is a directory
     if [ ! -d "$path" ]; then
@@ -83,41 +107,40 @@ if [[ "$#" -ge 2 && "$1" =~ ^[0-9]+$ ]]; then
         exit 1
     fi
 
-    # Fetch the download link
-    if link=$(get_download_link "$lang" "$number"); then
-        # Optimize aria2c download settings (parallel connections and chunking)
-        aria2c --file-allocation=falloc --human-readable=true -x16 -s16 -j5 --remote-time=true -c --conditional-get=true --allow-overwrite=true --download-result=full "$link" --dir="$path"
-        echo "Download completed: Track $number in $lang saved to $path"
-    else
-        echo "Warning: No valid download link found for track '$number' in '$lang'."
-    fi
+    # Download each requested track for each valid language
+    for lang in $valid_langs; do
+        for number in "${numbers[@]}"; do
+            if link=$(get_download_link "$lang" "$number"); then
+                aria2c --file-allocation=falloc --human-readable=false -x16 -s16 -j5 --remote-time=true -c --conditional-get=true --allow-overwrite=true --download-result=hide "$link" --dir="$path"
+                echo "Download completed: Track $number in $lang saved to $path"
+            else
+                echo "Warning: No valid download link found for track '$number' in '$lang'."
+            fi
+        done
+    done
 
 else
     # Usage 1: Fetch and display tracks for given languages
-
-    # Arrays to hold track lists for each language
     declare -A tracks
 
     # Check for valid languages before fetching
-    valid_langs=()
-    for lang in "$@"; do
-        if echo "$valid_lang_codes" | grep -q "$lang"; then
-            valid_langs+=("$lang")
-        fi
-    done
+    valid_langs=$(check_valid_langs "$@")
 
-    # Notify user about invalid languages
-    check_valid_langs "$@"
+    # Ensure there's at least one valid language
+    if [ -z "$valid_langs" ]; then
+        echo "Error: No valid languages provided. Cannot display tracks."
+        exit 1
+    fi
 
     # Fetch track lists for each valid language
-    for lang in "${valid_langs[@]}"; do
+    for lang in $valid_langs; do
         echo "Fetching tracks for $lang..."
         tracks[$lang]=$(fetch_tracks "$lang")
     done
 
     # Create arrays for each language
     declare -A lang_arr
-    for lang in "${valid_langs[@]}"; do
+    for lang in $valid_langs; do
         for track in ${tracks[$lang]}; do
             lang_arr["$lang,$track"]="$track ($lang)"
         done
@@ -125,11 +148,11 @@ else
 
     # Output table header
     header="|No.|"
-    for lang in "${valid_langs[@]}"; do
+    for lang in $valid_langs; do
         header+="$(printf "%-9s|" "$lang")"
     done
     header+="\n|---|"
-    for lang in "${valid_langs[@]}"; do
+    for lang in $valid_langs; do
         header+="---------|"
     done
     echo -e "$header"
@@ -137,7 +160,7 @@ else
     # Loop from 0 to 159 to display each track
     for i in {0..159}; do
         row="|$(printf "%3d|" "$i")"
-        for lang in "${valid_langs[@]}"; do
+        for lang in $valid_langs; do
             val="${lang_arr["$lang,$i"]:-}"
             [ -z "$val" ] && val="         "
             row+="$(printf "%9s|" "$val")"
