@@ -6,6 +6,7 @@ WTLOCALE="${2:-VT}"  # Default to VT if not provided
 PUB="${3:-nwt}"      # Default to nwt if not provided
 
 # Path to JSON file
+# This JSON file can be generate by this maker → https://raw.githubusercontent.com/vangquan/scripts/refs/heads/main/bible_lookup_maker.sh
 json_file="/path/to/bible_lookup.json"
 
 # Run Python with heredoc and pass arguments
