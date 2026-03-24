@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         JW.org Image Alt Caption (test)
+// @name         JW.org Image Alt Caption
 // @namespace    jw-alt-caption
 // @version      2.0
-// @description  Alt caption with UI controls (better UX)
+// @description  Alt caption with UI controls
 // @match        *://*.jw.org/*
 // @grant        none
 // @run-at       document-idle
