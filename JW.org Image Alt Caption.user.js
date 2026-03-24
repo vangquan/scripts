@@ -83,7 +83,7 @@ function injectStyles() {
             cursor: pointer;
         }
 
-        /* Panel */
+        /* Panel (auto size) */
         #jw-panel {
             position: fixed;
             bottom: 70px;
@@ -95,9 +95,24 @@ function injectStyles() {
             font-size: 13px;
             z-index: 9999;
             display: none;
-            width: 180px;
+            width: auto;
+            min-width: 140px;
         }
 
+        /* Hover row (clickable) */
+        #jw-hover-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            color: #fff;
+        }
+
+        #jw-hover-label input {
+            accent-color: #4caf50;
+        }
+
+        /* Width controls */
         #jw-panel button {
             margin: 4px;
             width: 28px;
@@ -131,9 +146,8 @@ function createCaption(img) {
 
     img.insertAdjacentElement("afterend", caption);
 
-    // Apply behavior rules
     if (!settings.hoverOnly && img.width < settings.minWidth) {
-        img.classList.add("jw-small-img"); // hover fallback
+        img.classList.add("jw-small-img");
     }
 
     processedImages.add(img);
@@ -146,13 +160,12 @@ function resetCaptions() {
     processedImages = new WeakSet();
 }
 
-/* Re-run everything */
+/* Re-run */
 function reprocessAll() {
     resetCaptions();
     processImages();
 }
 
-/* Process images */
 function processImages(root = document) {
     root.querySelectorAll("img[alt]").forEach(createCaption);
 }
@@ -189,9 +202,9 @@ function createUI() {
     panel.id = "jw-panel";
 
     panel.innerHTML = `
-        <label>
+        <label id="jw-hover-label">
             <input type="checkbox" id="jw-hover">
-            Hover only
+            <span>Hover only</span>
         </label>
 
         <div id="jw-width-box" style="margin-top:8px;">
