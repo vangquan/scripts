@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         JW.org Image Alt Caption
+// @name         JW.org Image Alt Caption (test)
 // @namespace    jw-alt-caption
-// @version      1.1
-// @description  Show alt text as caption under images on jw.org
+// @version      2.0
+// @description  Alt caption with UI controls (better UX)
 // @match        *://*.jw.org/*
 // @grant        none
 // @run-at       document-idle
@@ -12,98 +12,252 @@
 'use strict';
 
 const CAPTION_CLASS = "jw-alt-caption";
+const STYLE_ID = "jw-alt-caption-style";
 
-/* Get the site's current text color */
-function getSiteTextColor() {
-    return getComputedStyle(document.body).color;
+/* ---------------- SETTINGS ---------------- */
+const SETTINGS_KEY = "jwCaptionSettings";
+
+let settings = {
+    hoverOnly: true,
+    minWidth: 200
+};
+
+function loadSettings() {
+    const saved = localStorage.getItem(SETTINGS_KEY);
+    if (saved) {
+        try { settings = {...settings, ...JSON.parse(saved)}; } catch {}
+    }
 }
 
-/* Decode HTML entities */
-function decodeHTML(html) {
-    const txt = document.createElement("textarea");
-    txt.innerHTML = html;
-    return txt.value;
+function saveSettings() {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }
 
-/* Create caption element */
+/* ---------------- STATE ---------------- */
+let processedImages = new WeakSet();
+
+/* ---------------- STYLE ---------------- */
+function injectStyles() {
+    if (document.getElementById(STYLE_ID)) return;
+
+    const style = document.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent = `
+        .${CAPTION_CLASS} {
+            font-size: 13px;
+            margin-top: 6px;
+            line-height: 1.4;
+            text-align: center;
+            color: inherit;
+            opacity: 0;
+            animation: jwFade 0.25s ease forwards;
+        }
+
+        @keyframes jwFade { to { opacity: 1; } }
+
+        /* Hover-only mode */
+        body.jw-hover-only .${CAPTION_CLASS} { display: none; }
+        body.jw-hover-only img:hover + .${CAPTION_CLASS},
+        body.jw-hover-only .${CAPTION_CLASS}:hover { display: block; }
+
+        /* Small images (hover fallback) */
+        .jw-small-img + .${CAPTION_CLASS} { display: none; }
+        .jw-small-img:hover + .${CAPTION_CLASS},
+        .jw-small-img + .${CAPTION_CLASS}:hover { display: block; }
+
+        /* Floating button */
+        #jw-btn {
+            position: fixed;
+            bottom: 16px;
+            left: 16px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: #333;
+            color: #fff;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            cursor: pointer;
+        }
+
+        /* Panel */
+        #jw-panel {
+            position: fixed;
+            bottom: 70px;
+            left: 16px;
+            background: #222;
+            color: #fff;
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 13px;
+            z-index: 9999;
+            display: none;
+            width: 180px;
+        }
+
+        #jw-panel button {
+            margin: 4px;
+            width: 28px;
+            height: 28px;
+        }
+
+        #jw-label {
+            font-size: 11px;
+            opacity: 0.8;
+            margin-top: 6px;
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+/* ---------------- CORE ---------------- */
+function isValidCaption(text) {
+    return text && text.length >= 5 && !/^\w+\.(jpg|png|gif|webp)$/i.test(text);
+}
+
 function createCaption(img) {
-
     if (!img.alt) return;
-    if (img.dataset.captionAdded) return;
+    if (processedImages.has(img)) return;
 
-    const captionText = decodeHTML(img.alt.trim());
-    if (!captionText) return;
+    const text = img.alt.trim();
+    if (!isValidCaption(text)) return;
 
     const caption = document.createElement("div");
     caption.className = CAPTION_CLASS;
-    caption.textContent = captionText;
-
-    caption.style.fontSize = "13px";
-    caption.style.color = getSiteTextColor();
-    caption.style.marginTop = "6px";
-    caption.style.lineHeight = "1.4";
-    caption.style.maxWidth = "100%";
-    caption.style.textAlign = "center";
+    caption.textContent = text;
 
     img.insertAdjacentElement("afterend", caption);
 
-    img.dataset.captionAdded = "true";
-}
-
-/* Update caption colors when theme changes */
-function updateCaptionColors() {
-    const color = getSiteTextColor();
-    document.querySelectorAll("." + CAPTION_CLASS).forEach(caption => {
-        caption.style.color = color;
-    });
-}
-
-/* Scan page for images */
-function processImages(root = document) {
-
-    const images = root.querySelectorAll("img[alt]");
-
-    images.forEach(img => {
-        createCaption(img);
-    });
-
-}
-
-/* Initial run */
-processImages();
-
-/* Watch for dynamic content */
-const observer = new MutationObserver(mutations => {
-
-    for (const mutation of mutations) {
-
-        mutation.addedNodes.forEach(node => {
-
-            if (node.nodeType !== 1) return;
-
-            if (node.tagName === "IMG") {
-                createCaption(node);
-            } else {
-                processImages(node);
-            }
-
-        });
-
+    // Apply behavior rules
+    if (!settings.hoverOnly && img.width < settings.minWidth) {
+        img.classList.add("jw-small-img"); // hover fallback
     }
 
+    processedImages.add(img);
+}
+
+/* Remove all captions + reset */
+function resetCaptions() {
+    document.querySelectorAll("." + CAPTION_CLASS).forEach(el => el.remove());
+    document.querySelectorAll(".jw-small-img").forEach(el => el.classList.remove("jw-small-img"));
+    processedImages = new WeakSet();
+}
+
+/* Re-run everything */
+function reprocessAll() {
+    resetCaptions();
+    processImages();
+}
+
+/* Process images */
+function processImages(root = document) {
+    root.querySelectorAll("img[alt]").forEach(createCaption);
+}
+
+/* ---------------- OBSERVER ---------------- */
+let scheduled = false;
+
+const observer = new MutationObserver(() => {
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(() => {
+        processImages();
+        scheduled = false;
+    });
 });
 
-observer.observe(document.body, {
-    childList: true,
-    subtree: true
-});
+function startObserver() {
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["alt"]
+    });
+}
 
-/* Watch for theme changes */
-const themeObserver = new MutationObserver(updateCaptionColors);
+/* ---------------- UI ---------------- */
+function createUI() {
 
-themeObserver.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ["class", "data-theme"]
-});
+    const btn = document.createElement("div");
+    btn.id = "jw-btn";
+    btn.textContent = "⚙";
+
+    const panel = document.createElement("div");
+    panel.id = "jw-panel";
+
+    panel.innerHTML = `
+        <label>
+            <input type="checkbox" id="jw-hover">
+            Hover only
+        </label>
+
+        <div id="jw-width-box" style="margin-top:8px;">
+            <div id="jw-label">Min width</div>
+            <button id="jw-minus">-</button>
+            <span id="jw-width"></span>
+            <button id="jw-plus">+</button>
+        </div>
+    `;
+
+    document.body.appendChild(btn);
+    document.body.appendChild(panel);
+
+    let panelVisible = false;
+    btn.onclick = () => {
+        panelVisible = !panelVisible;
+        panel.style.display = panelVisible ? "block" : "none";
+    };
+
+    const hoverCheckbox = panel.querySelector("#jw-hover");
+    const widthText = panel.querySelector("#jw-width");
+    const plus = panel.querySelector("#jw-plus");
+    const minus = panel.querySelector("#jw-minus");
+    const widthBox = panel.querySelector("#jw-width-box");
+
+    function renderUI() {
+        hoverCheckbox.checked = settings.hoverOnly;
+        widthText.textContent = settings.minWidth + "px";
+
+        widthBox.style.display = settings.hoverOnly ? "none" : "block";
+        document.body.classList.toggle("jw-hover-only", settings.hoverOnly);
+    }
+
+    hoverCheckbox.onchange = () => {
+        settings.hoverOnly = hoverCheckbox.checked;
+        saveSettings();
+        renderUI();
+        reprocessAll();
+    };
+
+    plus.onclick = () => {
+        settings.minWidth += 10;
+        saveSettings();
+        renderUI();
+        reprocessAll();
+    };
+
+    minus.onclick = () => {
+        settings.minWidth = Math.max(0, settings.minWidth - 10);
+        saveSettings();
+        renderUI();
+        reprocessAll();
+    };
+
+    renderUI();
+}
+
+/* ---------------- INIT ---------------- */
+function init() {
+    loadSettings();
+    injectStyles();
+    processImages();
+    startObserver();
+    createUI();
+}
+
+init();
 
 })();
