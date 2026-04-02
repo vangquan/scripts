@@ -1,0 +1,207 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+########################################
+# Input
+########################################
+[[ -z "${1:-}" ]] && { echo "Usage: $0 <path>"; exit 1; }
+
+if [[ -f "$1" ]]; then
+  folder=$(dirname -- "$1")
+elif [[ -d "$1" ]]; then
+  folder="$1"
+else
+  echo "Invalid path"
+  exit 1
+fi
+
+########################################
+# Dependencies
+########################################
+required=(fzf find chafa ffmpeg mpv osascript caffeinate socat)
+for cmd in "${required[@]}"; do
+  command -v "$cmd" >/dev/null 2>&1 || {
+    echo "Error: '$cmd' is required"
+    exit 1
+  }
+done
+
+########################################
+# Globals
+########################################
+CAM_SOCKET="/tmp/mpv-camera-socket"
+CAM_PID=""
+
+########################################
+# Prevent sleep
+########################################
+caffeinate -dimsu &
+CAFFEINATE_PID=$!
+
+########################################
+# Menu bar state
+########################################
+ORIGINAL_STATE=$(osascript -e 'tell application "System Events" to tell dock preferences to get autohide menu bar' 2>/dev/null || echo "false")
+
+########################################
+# Cleanup
+########################################
+cleanup() {
+  osascript -e "tell application \"System Events\" to tell dock preferences to set autohide menu bar to $ORIGINAL_STATE" >/dev/null 2>&1 || true
+  kill "$CAFFEINATE_PID" >/dev/null 2>&1 || true
+  stop_camera
+  rm -f "$entries_script" "$play_script"
+}
+trap cleanup EXIT INT TERM
+
+osascript -e 'tell application "System Events" to tell dock preferences to set autohide menu bar to true' >/dev/null 2>&1 || true
+
+########################################
+# Camera control
+########################################
+start_camera() {
+  if [[ -S "$CAM_SOCKET" ]] && kill -0 "${CAM_PID:-0}" 2>/dev/null; then
+    return
+  fi
+
+  nohup bash -c '
+    ffmpeg -loglevel quiet \
+      -f avfoundation -framerate 60 -video_size 1920x1080 -i "qPhone Camera" \
+      -fflags nobuffer -flags low_delay -f mpegts - | \
+    mpv --no-cache --untimed --profile=low-latency \
+        --fs --screen=1 --ontop --no-border \
+        --force-window=immediate \
+        --idle=yes \
+        --input-ipc-server='"$CAM_SOCKET"' \
+        -
+  ' >/dev/null 2>&1 &
+
+  CAM_PID=$!
+  sleep 0.8
+}
+
+stop_camera() {
+  if [[ -S "$CAM_SOCKET" ]]; then
+    echo '{ "command": ["quit"] }' | socat - "$CAM_SOCKET" >/dev/null 2>&1 || true
+    sleep 0.2
+  fi
+
+  if [[ -n "${CAM_PID:-}" ]] && kill -0 "$CAM_PID" 2>/dev/null; then
+    kill "$CAM_PID" 2>/dev/null || true
+    wait "$CAM_PID" 2>/dev/null || true
+  fi
+
+  pkill -9 -f "mpv.*$CAM_SOCKET" 2>/dev/null || true
+  rm -f "$CAM_SOCKET" 2>/dev/null || true
+  CAM_PID=""
+}
+
+########################################
+# Preview
+########################################
+preview_cmd='
+file="$1"
+w=${FZF_PREVIEW_COLUMNS:-40}
+h=${FZF_PREVIEW_LINES:-20}
+
+case "$file" in
+  *.jpg|*.jpeg|*.png|*.gif)
+    chafa --size="${w}x${h}" --format=kitty --colors=full --dither=none "$file" 2>/dev/null
+    ;;
+  *)
+    ffmpeg -loglevel error -ss 1 -i "$file" -vframes 1 -f image2 - 2>/dev/null | \
+      chafa --size="${w}x${h}" --format=kitty --colors=full --dither=none - 2>/dev/null
+    ;;
+esac
+'
+
+########################################
+# Entries script
+########################################
+entries_script=$(mktemp)
+
+cat > "$entries_script" <<EOF
+#!/usr/bin/env bash
+folder="$folder"
+
+find "\$folder" -maxdepth 1 -type f,l \\( \
+  -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.mov" -o -iname "*.avi" \
+  -o -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.gif" \
+\\) | sort | while read -r f; do
+  printf "%s\t%s\n" "\$(basename "\$f")" "\$f"
+done
+EOF
+
+chmod +x "$entries_script"
+
+########################################
+# Play script
+########################################
+play_script=$(mktemp)
+
+cat > "$play_script" <<'EOF'
+#!/usr/bin/env bash
+file="$1"
+CAM_SOCKET="/tmp/mpv-camera-socket"
+
+# stop camera
+echo '{ "command": ["quit"] }' | socat - "$CAM_SOCKET" >/dev/null 2>&1 || true
+sleep 0.2
+
+case "$file" in
+  *.jpg|*.jpeg|*.png|*.gif)
+    mpv --really-quiet --no-terminal \
+        --fs --no-native-fs --screen=1 --ontop --no-border \
+        --cursor-autohide=always \
+        --image-display-duration=5 \
+        "$file"
+    ;;
+  *)
+    mpv --really-quiet --no-terminal \
+        --fs --no-native-fs --screen=1 --ontop --no-border \
+        --cursor-autohide=always \
+        "$file"
+    ;;
+esac
+
+# restart camera
+nohup bash -c '
+ffmpeg -loglevel quiet \
+  -f avfoundation -framerate 60 -video_size 1920x1080 -i "qPhone Camera" \
+  -fflags nobuffer -flags low_delay -f mpegts - | \
+mpv --no-cache --untimed --profile=low-latency \
+    --fs --no-native-fs --screen=1 --ontop --no-border \
+    --force-window=immediate \
+    --idle=yes \
+    --input-ipc-server='"$CAM_SOCKET"' \
+    -
+' >/dev/null 2>&1 &
+
+# give focus back to terminal
+osascript -e 'tell application "Ghostty" to activate' >/dev/null 2>&1 || true
+EOF
+
+chmod +x "$play_script"
+
+########################################
+# Start camera
+########################################
+start_camera
+
+########################################
+# Persistent FZF (no reload, no cursor jump)
+########################################
+"$entries_script" | fzf \
+  --ansi \
+  --delimiter='\t' \
+  --with-nth=1 \
+  --height=100% \
+  --reverse \
+  --border=rounded \
+  --prompt=" JW Media ▶ " \
+  --header="Enter=Play | Esc=Exit | Ctrl-R=Refresh" \
+  --cycle \
+  --preview "bash -c '$preview_cmd' _ {2}" \
+  --preview-window=bottom:30% \
+  --bind "enter:execute-silent($play_script {2})" \
+  --bind "ctrl-r:reload($entries_script)"
