@@ -64,26 +64,29 @@ start_camera() {
     return
   fi
 
+
+# uyvy422 = yuyv422 > nv12
   nohup bash -c '
-    ffmpeg -loglevel quiet \
-      -f avfoundation -framerate 60 -video_size 1920x1080 -i "qPhone Camera" \
-      -fflags nobuffer -flags low_delay -f mpegts - | \
+    ffmpeg -f avfoundation \
+      -pixel_format nv12 \
+      -framerate 60 \
+      -video_size 1920x1080 \
+      -i "qPhone Camera:none" \
+      -c:v rawvideo \
+      -f nut - | \
     mpv --no-cache --untimed --profile=low-latency \
-        --fs --screen=1 --ontop --no-border \
-        --force-window=immediate \
-        --idle=yes \
+        --fs --no-native-fs --screen=1 --ontop --no-border \
+        --demuxer-lavf-o=fflags=nobuffer \
         --input-ipc-server='"$CAM_SOCKET"' \
         -
   ' >/dev/null 2>&1 &
 
   CAM_PID=$!
-  sleep 0.8
 }
 
 stop_camera() {
   if [[ -S "$CAM_SOCKET" ]]; then
     echo '{ "command": ["quit"] }' | socat - "$CAM_SOCKET" >/dev/null 2>&1 || true
-    sleep 0.2
   fi
 
   if [[ -n "${CAM_PID:-}" ]] && kill -0 "$CAM_PID" 2>/dev/null; then
@@ -146,7 +149,6 @@ CAM_SOCKET="/tmp/mpv-camera-socket"
 
 # stop camera
 echo '{ "command": ["quit"] }' | socat - "$CAM_SOCKET" >/dev/null 2>&1 || true
-sleep 0.2
 
 case "$file" in
   *.jpg|*.jpeg|*.png|*.gif)
@@ -166,13 +168,17 @@ esac
 
 # restart camera
 nohup bash -c '
-ffmpeg -loglevel quiet \
-  -f avfoundation -framerate 60 -video_size 1920x1080 -i "qPhone Camera" \
-  -fflags nobuffer -flags low_delay -f mpegts - | \
+
+ffmpeg -f avfoundation \
+  -pixel_format nv12 \
+  -framerate 60 \
+  -video_size 1920x1080 \
+  -i "qPhone Camera:none" \
+  -c:v rawvideo \
+  -f nut - | \
 mpv --no-cache --untimed --profile=low-latency \
     --fs --no-native-fs --screen=1 --ontop --no-border \
-    --force-window=immediate \
-    --idle=yes \
+    --demuxer-lavf-o=fflags=nobuffer \
     --input-ipc-server='"$CAM_SOCKET"' \
     -
 ' >/dev/null 2>&1 &
@@ -189,7 +195,7 @@ chmod +x "$play_script"
 start_camera
 
 ########################################
-# Persistent FZF (no reload, no cursor jump)
+# Persistent FZF
 ########################################
 "$entries_script" | fzf \
   --ansi \
@@ -199,9 +205,13 @@ start_camera
   --reverse \
   --border=rounded \
   --prompt=" JW Media ▶ " \
-  --header="Enter=Play | Esc=Exit | Ctrl-R=Refresh" \
+  --footer-border=top \
+  --footer="Enter=Play | Esc=Exit | Ctrl-R=Refresh" \
   --cycle \
+  --sync \
+  --highlight-line \
   --preview "bash -c '$preview_cmd' _ {2}" \
-  --preview-window=bottom:30% \
+  --preview-window=bottom:30%:wrap \
+  --preview-border=top \
   --bind "enter:execute-silent($play_script {2})" \
   --bind "ctrl-r:reload($entries_script)"
